@@ -1,0 +1,107 @@
+name: Build IPA (unsigned)
+
+# 在 GitHub macOS 云主机上构建 iOS 应用，产出**未签名 IPA**（签名/侧载由使用者自备）。
+# 要点见 ios-ipa-cloud-build 技能：xcodegen 生成工程（不手写 pbxproj）、锁 xcodeVersion、
+# 产物发 Release（免登录直链）、未签名构建要关 CODE_SIGNING。
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios/**'
+      - 'webapp/**'
+      - '.github/workflows/ios-ipa.yml'
+
+permissions:
+  contents: write          # 发 Release 附件需要
+
+concurrency:
+  group: ios-ipa
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 选最新可用 Xcode
+        run: |
+          for v in 16.4 16.3 16.2 16.1 16.0 15.4; do
+            if [ -d "/Applications/Xcode_$v.app" ]; then
+              sudo xcode-select -s "/Applications/Xcode_$v.app"
+              echo "selected Xcode $v"; break
+            fi
+          done
+          xcodebuild -version
+
+      - name: 安装 xcodegen
+        run: brew install xcodegen
+
+      - name: 准备 Web 资源（页面 + 离线 vendor）
+        run: |
+          set -euo pipefail
+          rm -rf ios/Web
+          mkdir -p ios/Web/vendor
+          cp webapp/index.html ios/Web/index.html
+          cp webapp/vendor/pdf.min.js ios/Web/vendor/
+          cp webapp/vendor/pdf.worker.min.js ios/Web/vendor/
+          cp webapp/vendor/pdf-lib.min.js ios/Web/vendor/
+          test -f ios/Web/index.html
+          test -f ios/Web/vendor/pdf.min.js
+
+      - name: 生成 Xcode 工程
+        run: cd ios && xcodegen generate && ls ZhentuAnnotation.xcodeproj
+
+      - name: 编译（真机 arm64，不签名）
+        run: |
+          cd ios
+          set -o pipefail
+          xcodebuild -project ZhentuAnnotation.xcodeproj -scheme ZhentuAnnotation \
+            -configuration Release -sdk iphoneos -derivedDataPath build \
+            ONLY_ACTIVE_ARCH=NO ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee /tmp/xcodebuild.log
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          echo "APP=$APP"; test -n "$APP"
+          echo "==== Info.plist 关键字段 ===="
+          plutil -p "$APP/Info.plist" | grep -E "CFBundle|MinimumOSVersion|UIApplicationSceneManifest|UIScene|UIDeviceFamily" -A2 || true
+          echo "==== Web 资源 ===="
+          ls "$APP" && ls "$APP/Web" && ls "$APP/Web/vendor"
+          rm -rf "$RUNNER_TEMP/ipa" && mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/ipa/Payload/"
+
+      - name: 打成未签名 IPA
+        run: |
+          cd "$RUNNER_TEMP/ipa"
+          zip -qry "$GITHUB_WORKSPACE/app-unsigned.ipa" Payload
+          cd "$GITHUB_WORKSPACE"
+          ls -lh app-unsigned.ipa
+
+      - name: 上传 Actions 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-ipa
+          path: app-unsigned.ipa
+          if-no-files-found: error
+
+      - name: 发布到 Releases（免登录直链）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=v1.0-ipa
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" app-unsigned.ipa --clobber
+          else
+            gh release create "$TAG" app-unsigned.ipa --title '未签名 IPA' --notes '用 Sideloadly / AltStore / 爱思助手 导入并自行签名。免费 Apple ID 签名 7 天过期。'
+          fi
+          gh release view "$TAG" --json assets -q '.assets[].browser_download_url'
+
+      - name: 失败时打印错误
+        if: failure()
+        run: |
+          echo "==== 编译错误 ===="
+          grep -E "error:" /tmp/xcodebuild.log | head -40 || true
+          echo "==== 末尾 ===="
+          tail -40 /tmp/xcodebuild.log || true

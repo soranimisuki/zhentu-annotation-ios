@@ -1,0 +1,30 @@
+[
+  {
+    "name": "open-blank-pdf",
+    "awaitPromise": true,
+    "waitMs": 1200,
+    "expr": "(async () => { const d = await PDFLib.PDFDocument.create(); d.addPage([595, 842]); const b = await d.save(); await ZT.openB64(ZT.b64(b), 'probe.pdf'); return JSON.stringify(ZT.state()); })()"
+  },
+  {
+    "name": "prep-pen",
+    "expr": "ZT.setTool('pen'); window.__predCalls = 0; window.__origPredTail = drawPredTail; drawPredTail = function (pv) { window.__predCalls++; try { return window.__origPredTail(pv); } catch (e) { window.__predErr = String(e); } }; window.__errTrap = []; window.addEventListener('error', function (e) { window.__errTrap.push(String(e.message)); }); 'ok'"
+  },
+  {
+    "name": "stroke-with-prediction",
+    "awaitPromise": true,
+    "waitMs": 600,
+    "expr": "(async () => { const pv = S.pageViews[0]; const ic = pv.ic; const r = pv.pin.getBoundingClientRect(); const x0 = r.left + r.width * 0.3, y0 = r.top + r.height * 0.3; const rid = 77; const mk = (type, x, y, pres, extra) => new PointerEvent(type, Object.assign({ bubbles: true, cancelable: true, composed: true, pointerType: 'pen', pointerId: rid, isPrimary: true, pressure: pres, clientX: x, clientY: y, buttons: type === 'pointerup' || type === 'pointercancel' ? 0 : 1 }, extra || {})); let predSeen = 0; ic.dispatchEvent(mk('pointerdown', x0, y0, 0.4)); for (let i = 1; i <= 14; i++) { const x = x0 + i * 9, y = y0 + i * 4; const ev = mk('pointermove', x, y, 0.4 + i * 0.03, { getCoalescedEvents: function () { return [mk('pointermove', x - 3, y - 1.5, 0.4), mk('pointermove', x - 1.5, y - 0.7, 0.4)]; }, getPredictedEvents: function () { return [mk('pointermove', x + 6, y + 2.5, 0.35), mk('pointermove', x + 11, y + 5, 0.3), mk('pointermove', x + 15, y + 7, 0.25)]; } }); window.dispatchEvent(ev); predSeen = live.pred ? live.pred.length : 0; await new Promise(function (res) { requestAnimationFrame(res); }); } const predDuring = window.__predCalls; const predLen = live.pred ? live.pred.length : -1; window.dispatchEvent(mk('pointerup', x0 + 140, y0 + 60, 0.2)); await new Promise(function (res) { setTimeout(res, 350); }); const pg = ZT.docStore().pages[0]; const inkData = pv.ictx.getImageData(0, 0, pv.ic.width, pv.ic.height).data; let inkPix = 0; for (let i = 3; i < inkData.length; i += 4) if (inkData[i] > 40) inkPix++; return JSON.stringify({ strokes: ZT.state().strokes, undo: ZT.state().undo, predDuringCalls: predDuring, predLenDuringStroke: predLen, predAfterUp: live.pred, predErr: window.__predErr || null, inkPix: inkPix, errTrap: window.__errTrap }); })()"
+  },
+  {
+    "name": "undo-works",
+    "expr": "ZT.undo(); JSON.stringify({ strokes: ZT.state().strokes })"
+  },
+  {
+    "name": "eraser-path",
+    "expr": "(function () { ZT.setTool('pen'); window.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'pen', pointerId: 77 })); ZT.setTool('eraser'); return ZT.state().tool; })()"
+  },
+  {
+    "name": "pencil-switch-previous",
+    "expr": "(function () { ZT.setTool('pen'); const s0 = ZT.state().tool; window.__ztPencilTap('switchPrevious'); const s1 = ZT.state().tool; window.__ztPencilTap('switchPrevious'); const s2 = ZT.state().tool; return JSON.stringify({ s0: s0, s1: s1, s2: s2 }); })()"
+  }
+]

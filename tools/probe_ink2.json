@@ -1,0 +1,42 @@
+[
+  {
+    "name": "open-blank-pdf",
+    "awaitPromise": true,
+    "waitMs": 1200,
+    "expr": "(async () => { const d = await PDFLib.PDFDocument.create(); d.addPage([595, 842]); const b = await d.save(); await ZT.openB64(ZT.b64(b), 'probe.pdf'); return 'opened:' + ZT.state().pages; })()"
+  },
+  {
+    "name": "prep-pen-tool",
+    "expr": "ZT.setTool('pen'); JSON.stringify({ tool: ZT.state().tool, rect: ZT.pageRect(0) })"
+  },
+  {
+    "name": "down",
+    "expr": "(function () { const r = ZT.pageRect(0); window.__x0 = r.left + r.width * 0.3; window.__y0 = r.top + r.height * 0.3; const ic = document.querySelector('.pv[data-i=\"0\"] .ic'); const ev = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 77, isPrimary: true, pressure: 0.4, clientX: window.__x0, clientY: window.__y0, buttons: 1 }); ic.dispatchEvent(ev); return JSON.stringify({ state: ZT.liveState() }); })()"
+  },
+  {
+    "name": "moves-with-prediction",
+    "expr": "(function () { for (let i = 1; i <= 12; i++) { const x = window.__x0 + i * 9, y = window.__y0 + i * 4; const ev = new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 77, isPrimary: true, pressure: 0.4 + i * 0.02, clientX: x, clientY: y, buttons: 1 }); Object.defineProperty(ev, 'getPredictedEvents', { value: function () { return [{ clientX: x + 6, clientY: y + 2.5, pressure: 0.3 }, { clientX: x + 11, clientY: y + 5, pressure: 0.25 }, { clientX: x + 15, clientY: y + 7, pressure: 0.2 }]; } }); Object.defineProperty(ev, 'getCoalescedEvents', { value: function () { return [{ clientX: x - 3, clientY: y - 1.5, pressure: 0.4 }, { clientX: x - 1.5, clientY: y - 0.7, pressure: 0.4 }]; } }); window.dispatchEvent(ev); } return JSON.stringify({ state: ZT.liveState() }); })()"
+  },
+  {
+    "name": "raf-still-alive",
+    "awaitPromise": true,
+    "waitMs": 80,
+    "expr": "(async () => { await new Promise(function (res) { requestAnimationFrame(res); }); return 'raf-ok, state=' + JSON.stringify(ZT.liveState()); })()"
+  },
+  {
+    "name": "pred-expiry-timer",
+    "awaitPromise": true,
+    "waitMs": 300,
+    "expr": "(async () => { await new Promise(function (res) { setTimeout(res, 0); }); return JSON.stringify({ state: ZT.liveState() }); })()"
+  },
+  {
+    "name": "up-commit",
+    "awaitPromise": true,
+    "waitMs": 500,
+    "expr": "(async () => { window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 77, isPrimary: true, pressure: 0.2, clientX: window.__x0 + 112, clientY: window.__y0 + 50, buttons: 0 })); await new Promise(function (res) { setTimeout(res, 350); }); return JSON.stringify({ strokes: ZT.state().strokes, live: ZT.liveState(), ink: ZT.inkStats(0) }); })()"
+  },
+  {
+    "name": "undo",
+    "expr": "ZT.undo(); JSON.stringify({ strokes: ZT.state().strokes })"
+  }
+]

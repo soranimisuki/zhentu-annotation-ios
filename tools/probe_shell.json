@@ -1,0 +1,14 @@
+[
+  {
+    "name": "open-blank-pdf",
+    "awaitPromise": true,
+    "waitMs": 1200,
+    "expr": "(async () => { const d = await PDFLib.PDFDocument.create(); d.addPage([595, 842]); const b = await d.save(); await ZT.openB64(ZT.b64(b), 'probe.pdf'); return 'opened:' + ZT.state().pages; })()"
+  },
+  {
+    "name": "export-via-button",
+    "awaitPromise": true,
+    "waitMs": 600,
+    "expr": "(async () => { const b = document.getElementById('bExport'); b.click(); await new Promise(function (res) { setTimeout(res, 500); }); const t = document.getElementById('toast'); return JSON.stringify({ toast: t ? t.textContent : null }); })()"
+  }
+]
