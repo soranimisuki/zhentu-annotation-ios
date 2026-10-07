@@ -984,6 +984,12 @@ function toggleEraser(){
 /* 增强版：双击切换橡皮的开关（右上角 ⋯ 菜单里可关）
    注意只有"双击"路径受控；右下角悬浮按钮、工具条 🧽 始终可用 */
 function toggleEraserByDbl(){
+  /* iOS App 内一律禁用"笔尖快速两下"检测：原生 UIPencilInteraction 已接管笔杆双击。
+     小字快速书写时，短促小笔画（<240ms 且位移 <7px）恰好符合"轻点"特征，
+     下一笔落在 650ms/40px 窗口内就被误判成双击——切去橡皮+删掉上一笔，
+     手感正是"第二笔写不出来、第三笔才出来"（2026-10-07 用户实测定位）。
+     App 里的兜底：笔杆双击（原生）+ 右下角悬浮快切按钮 + 工具条 🧽。 */
+  if(SHELL)return false;
   if(!prefs.dblEraser)return false;
   toggleEraser();return true;
 }

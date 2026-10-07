@@ -1,0 +1,14 @@
+[
+  {
+    "name": "open-blank-pdf",
+    "awaitPromise": true,
+    "waitMs": 1200,
+    "expr": "(async () => { const d = await PDFLib.PDFDocument.create(); d.addPage([595, 842]); const b = await d.save(); await ZT.openB64(ZT.b64(b), 'dbl.pdf'); return 'opened:' + ZT.state().pages + ' shell=' + window.SHELL; })()"
+  },
+  {
+    "name": "two-quick-small-strokes",
+    "awaitPromise": true,
+    "waitMs": 400,
+    "expr": "(async () => { ZT.setTool('pen'); const r = ZT.pageRect(0), cs = r.cssScale; const ic = document.querySelector('.pv[data-i=\"0\"] .ic'); const ev = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.4, clientX: r.left + x * cs, clientY: r.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); ic.dispatchEvent(ev('pointerdown', 200, 200, 91)); window.dispatchEvent(ev('pointermove', 202, 202, 91)); window.dispatchEvent(ev('pointerup', 203, 203, 91)); await new Promise(res => setTimeout(res, 120)); const toolAfter1 = ZT.state().tool; const strokesAfter1 = ZT.state().strokes; ic.dispatchEvent(ev('pointerdown', 210, 205, 92)); window.dispatchEvent(ev('pointermove', 212, 207, 92)); window.dispatchEvent(ev('pointerup', 213, 208, 92)); await new Promise(res => setTimeout(res, 120)); const toolAfter2 = ZT.state().tool; const strokesAfter2 = ZT.state().strokes; ic.dispatchEvent(ev('pointerdown', 220, 210, 93)); window.dispatchEvent(ev('pointermove', 222, 212, 93)); window.dispatchEvent(ev('pointerup', 223, 213, 93)); await new Promise(res => setTimeout(res, 150)); return JSON.stringify({ toolAfter1: toolAfter1, strokesAfter1: strokesAfter1, toolAfter2: toolAfter2, strokesAfter2: strokesAfter2, final: { tool: ZT.state().tool, strokes: ZT.state().strokes }, ink: ZT.inkStats(0) }); })()"
+  }
+]
