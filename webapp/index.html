@@ -802,6 +802,7 @@ async function ensureLibs(){
    原生壳注入 __ZT_SHELL=1（document-start user script）并提供 ztBridge 消息通道。
    ?shelltest=1 仅用于无头自动化测试，强制按壳内路径执行。 */
 var SHELL=(location.search.indexOf("shelltest=1")>=0)||((typeof __ZT_SHELL!=="undefined")&&__ZT_SHELL===1)||!!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.ztBridge);
+if(SHELL&&window.__ZT_SHELL_BUILD)setTimeout(function(){toastOnce("ztbuild","真题批注 iOS · "+window.__ZT_SHELL_BUILD)},600);
 function shellImport(kind){
   try{window.webkit.messageHandlers.ztBridge.postMessage({type:"import",kind:kind})}
   catch(e){toast("导入桥不可用："+(e&&e.message||e))}
@@ -4150,6 +4151,10 @@ function msMoveScale(pv,pt){
   if(live.mode==="mv"){
     var dx=pt.x-live.sx,dy=pt.y-live.sy;
     live.base.items.forEach(function(b){var p=b.st.pts,q=b.pts,i;
+      if(b.st.t==="g"){ /* 图形是 4 坐标 bbox/端点，不是 3 步长采样点——整体平移。
+           原实现按采样点变换：p[3](y1) 被加了 x 偏移、还追加 NaN 坐标，
+           图形直接改坏 → 框选中图形消失/变形（2026-10-07 用户反馈） */
+        p[0]=r1(q[0]+dx);p[1]=r1(q[1]+dy);p[2]=r1(q[2]+dx);p[3]=r1(q[3]+dy);return}
       for(i=0;i<q.length;i+=3){p[i]=r1(q[i]+dx);p[i+1]=r1(q[i+1]+dy)}});
     msRecomputeBox();
   }else if(live.mode==="msz"){
@@ -4160,6 +4165,9 @@ function msMoveScale(pv,pt){
     if(hi===0){ax=nx;ay=ny}else if(hi===1){ay=ny;bx=nx}else if(hi===2){bx=nx;by=ny}else{ax=nx;by=ny}
     var kx=(bx-ax)/Math.max(MIN,B.x1-B.x0),ky=(by-ay)/Math.max(MIN,B.y1-B.y0);
     live.base.items.forEach(function(b){var p=b.st.pts,q=b.pts,i;
+      if(b.st.t==="g"){ /* 图形 bbox 两角按同一映射缩放 */
+        p[0]=r1(ax+(q[0]-B.x0)*kx);p[1]=r1(ay+(q[1]-B.y0)*ky);
+        p[2]=r1(ax+(q[2]-B.x0)*kx);p[3]=r1(ay+(q[3]-B.y0)*ky);return}
       for(i=0;i<q.length;i+=3){p[i]=r1(ax+(q[i]-B.x0)*kx);p[i+1]=r1(ay+(q[i+1]-B.y0)*ky)}});
     msRecomputeBox();
   }

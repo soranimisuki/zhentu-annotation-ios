@@ -1,0 +1,32 @@
+[
+  {
+    "name": "open-blank-pdf",
+    "awaitPromise": true,
+    "waitMs": 1200,
+    "expr": "(async () => { const d = await PDFLib.PDFDocument.create(); d.addPage([595, 842]); const b = await d.save(); await ZT.openB64(ZT.b64(b), 'ms.pdf'); return 'opened'; })()"
+  },
+  {
+    "name": "draw-circle-convert",
+    "awaitPromise": true,
+    "waitMs": 1500,
+    "expr": "(async () => { ZT.setTool('pen'); const R = ZT.pageRect(0), cs = R.cssScale, ic = document.querySelector('.pv[data-i=\"0\"] .ic'); const mk = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.4, clientX: R.left + x * cs, clientY: R.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); const pts = ZT.mockLoopPts('circle', 46, 1); ic.dispatchEvent(mk('pointerdown', pts[0][0], pts[0][1], 400)); for (let i = 1; i < pts.length; i++) window.dispatchEvent(mk('pointermove', pts[i][0], pts[i][1], 400)); await new Promise(res => setTimeout(res, 950)); window.dispatchEvent(mk('pointerup', pts[pts.length - 1][0], pts[pts.length - 1][1], 400)); await new Promise(res => setTimeout(res, 200)); const st = ZT.lastStroke(0); return JSON.stringify({ kind: st ? st.k : null, box: st ? st.pts : null }); })()"
+  },
+  {
+    "name": "lasso-select-shape",
+    "awaitPromise": true,
+    "waitMs": 300,
+    "expr": "(async () => { ZT.setTool('marquee'); const R = ZT.pageRect(0), cs = R.cssScale, ic = document.querySelector('.pv[data-i=\"0\"] .ic'); const mk = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.4, clientX: R.left + x * cs, clientY: R.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); ic.dispatchEvent(mk('pointerdown', 20, 20, 401)); const seq = []; for (let i = 0; i <= 8; i++) seq.push([20 + i * 30, 20]); for (let i = 0; i <= 8; i++) seq.push([260, 20 + i * 30]); for (let i = 0; i <= 8; i++) seq.push([260 - i * 30, 260]); for (let i = 0; i <= 8; i++) seq.push([20, 260 - i * 30]); seq.forEach(q => window.dispatchEvent(mk('pointermove', q[0], q[1], 401))); window.dispatchEvent(mk('pointerup', 20, 20, 401)); await new Promise(res => setTimeout(res, 200)); window.__before = ZT.docStore(); const sh = window.__before.pages[0].s.find(s => s.t === 'g'); return JSON.stringify({ selectedShape: !!sh, box: sh ? sh.pts : null }); })()"
+  },
+  {
+    "name": "move-selection-with-shape",
+    "awaitPromise": true,
+    "waitMs": 400,
+    "expr": "(async () => { const R = ZT.pageRect(0), cs = R.cssScale, ic = document.querySelector('.pv[data-i=\"0\"] .ic'); const mk = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.4, clientX: R.left + x * cs, clientY: R.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); ic.dispatchEvent(mk('pointerdown', 140, 140, 402)); for (let i = 1; i <= 12; i++) window.dispatchEvent(mk('pointermove', 140 + i * 5, 140 + i * 3, 402)); window.dispatchEvent(mk('pointerup', 200, 176, 402)); await new Promise(res => setTimeout(res, 300)); const after = ZT.docStore(); const sh = after.pages[0].s.find(s => s.t === 'g'); const old = window.__before.pages[0].s.find(s => s.t === 'g'); return JSON.stringify({ oldBox: old ? old.pts : null, newBox: sh ? sh.pts : null, finite: sh ? sh.pts.every(v => isFinite(v)) : false, movedDx: sh ? sh.pts[0] - old.pts[0] : null, movedDy: sh ? sh.pts[1] - old.pts[1] : null, ink: ZT.inkStats(0) }); })()"
+  },
+  {
+    "name": "scale-selection-with-shape",
+    "awaitPromise": true,
+    "waitMs": 400,
+    "expr": "(async () => { const R = ZT.pageRect(0), cs = R.cssScale, ic = document.querySelector('.pv[data-i=\"0\"] .ic'); const mk = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.4, clientX: R.left + x * cs, clientY: R.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); const cur = ZT.docStore().pages[0].s.find(s => s.t === 'g'); window.__sb = cur.pts.slice(); ic.dispatchEvent(mk('pointerdown', cur.pts[0], cur.pts[1], 403)); for (let i = 1; i <= 10; i++) window.dispatchEvent(mk('pointermove', cur.pts[0] - i * 2, cur.pts[1] - i * 2, 403)); window.dispatchEvent(mk('pointerup', cur.pts[0] - 20, cur.pts[1] - 20, 403)); await new Promise(res => setTimeout(res, 300)); const sh = ZT.docStore().pages[0].s.find(s => s.t === 'g'); return JSON.stringify({ before: window.__sb, after: sh.pts, finite: sh.pts.every(v => isFinite(v)), ink: ZT.inkStats(0) }); })()"
+  }
+]

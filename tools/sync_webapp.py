@@ -59,6 +59,7 @@ BRIDGE = """/* ===== iOS 壳桥（仅 App 内生效；桌面浏览器 SHELL=fals
    原生壳注入 __ZT_SHELL=1（document-start user script）并提供 ztBridge 消息通道。
    ?shelltest=1 仅用于无头自动化测试，强制按壳内路径执行。 */
 var SHELL=(location.search.indexOf("shelltest=1")>=0)||((typeof __ZT_SHELL!=="undefined")&&__ZT_SHELL===1)||!!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.ztBridge);
+if(SHELL&&window.__ZT_SHELL_BUILD)setTimeout(function(){toastOnce("ztbuild","真题批注 iOS · "+window.__ZT_SHELL_BUILD)},600);
 function shellImport(kind){
   try{window.webkit.messageHandlers.ztBridge.postMessage({type:"import",kind:kind})}
   catch(e){toast("导入桥不可用："+(e&&e.message||e))}
