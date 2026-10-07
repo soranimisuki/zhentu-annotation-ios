@@ -193,8 +193,9 @@ src = rep(src,
           '  schedulePaint(pv);' + EOL +
           '  if((live.mode==="pen"||live.mode==="p")&&prefs.penSub===0)armSnapDwell(pv,e.clientX,e.clientY); /* 增强版：停笔不动→识别规则图形 */',
           '  /* iOS 壳增强：预测采样（getPredictedEvents，iOS 18.2+）——把系统预测的未来轨迹先画出来，' + EOL +
-          '     视觉上追回约一帧延迟；每来一个真实事件整条尾巴被替换，不支持时走原路径。 */' + EOL +
-          '  if(live.mode==="pen"||live.mode==="hl"){' + EOL +
+          '     视觉上追回约一帧延迟；每来一个真实事件整条尾巴被替换，不支持时走原路径。' + EOL +
+          '     __ZT_PRED===0（壳注入）＝关闭：桌面主文件无预测墨迹且书写正常，真机排障期 App 侧默认关。 */' + EOL +
+          '  if((live.mode==="pen"||live.mode==="hl")&&window.__ZT_PRED!==0){' + EOL +
           '    var pev=null;' + EOL +
           '    if(e.getPredictedEvents){try{pev=e.getPredictedEvents()}catch(err){pev=null}}' + EOL +
           '    live.pred=(pev&&pev.length)?pev:null;' + EOL +

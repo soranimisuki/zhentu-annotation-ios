@@ -664,6 +664,23 @@ var store={
   get:function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){toast("本机存储空间不足，最新内容可能没存上，建议尽快导出",4000);return false}}
 };
+/* ===== iOS 真机排障：全局错误陷阱（2026-10-07）=====
+   桌面一切正常、iPad App 内书写异常且远程无法复现——把未捕获异常直接显示在屏幕上，
+   用户截图即可拿到出错信息+行号；最近 20 条存 window.__ZT_ERRORS，控制台/ZT.errors() 可查。
+   同类错误 2 秒内只弹一次防刷屏。 */
+window.__ZT_ERRORS=[];
+var __ztLastErrToast=0;
+function __ztErrText(m){return String(m||"error").slice(0,160)}
+window.addEventListener("error",function(e){
+  var m=__ztErrText(e&&e.message)+(e&&e.lineno?" @"+(e.filename||"").split("/").pop()+":"+e.lineno:"");
+  window.__ZT_ERRORS.push(m);
+  if(window.__ZT_SHELL===1&&Date.now()-__ztLastErrToast>2000){__ztLastErrToast=Date.now();toast("⚠ 脚本异常："+m,5200)}
+});
+window.addEventListener("unhandledrejection",function(e){
+  var r=e&&e.reason,m=__ztErrText(r&&(r.message||r));
+  window.__ZT_ERRORS.push("promise: "+m);
+  if(window.__ZT_SHELL===1&&Date.now()-__ztLastErrToast>2000){__ztLastErrToast=Date.now();toast("⚠ 异步异常："+m,5200)}
+});
 
 /* ================= 偏好 ================= */
 var prefs=Object.assign({tool:"select",penC:1,penW:3,hlC:0,hlW:14,erW:20,zoom:0,vocabOpen:false,penSub:0,sentMode:false,dblEraser:true,noSelect:true},store.get("zt_prefs_v1",{}));
@@ -1790,8 +1807,9 @@ function onMove(e){
     pushInkSample(pv,e.clientX,e.clientY,e.pressure);
   }
   /* iOS 壳增强：预测采样（getPredictedEvents，iOS 18.2+）——把系统预测的未来轨迹先画出来，
-     视觉上追回约一帧延迟；每来一个真实事件整条尾巴被替换，不支持时走原路径。 */
-  if(live.mode==="pen"||live.mode==="hl"){
+     视觉上追回约一帧延迟；每来一个真实事件整条尾巴被替换，不支持时走原路径。
+     __ZT_PRED===0（壳注入）＝关闭：桌面主文件无预测墨迹且书写正常，真机排障期 App 侧默认关。 */
+  if((live.mode==="pen"||live.mode==="hl")&&window.__ZT_PRED!==0){
     var pev=null;
     if(e.getPredictedEvents){try{pev=e.getPredictedEvents()}catch(err){pev=null}}
     live.pred=(pev&&pev.length)?pev:null;
@@ -3484,6 +3502,7 @@ window.ZT={
     return out;
   },
   sentMode:function(v){if(v===undefined)return !!prefs.sentMode;setSentMode(v);return !!prefs.sentMode},
+  errors:function(){return (window.__ZT_ERRORS||[]).slice()}, /* iOS 真机排障：最近未捕获异常 */
   /* ===== iOS 壳增强：自动化探针钩子 ===== */
   liveState:function(){
     if(!live)return null;

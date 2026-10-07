@@ -1,0 +1,18 @@
+[
+  {
+    "name": "shell-state",
+    "expr": "JSON.stringify({ build: window.__ZT_SHELL_BUILD, pred: window.__ZT_PRED, errors: window.__ZT_ERRORS.length })"
+  },
+  {
+    "name": "open-blank-pdf",
+    "awaitPromise": true,
+    "waitMs": 1200,
+    "expr": "(async () => { const d = await PDFLib.PDFDocument.create(); d.addPage([595, 842]); const b = await d.save(); await ZT.openB64(ZT.b64(b), 'p.pdf'); return 'opened'; })()"
+  },
+  {
+    "name": "prediction-off-still-writes",
+    "awaitPromise": true,
+    "waitMs": 500,
+    "expr": "(async () => { ZT.setTool('pen'); const R = ZT.pageRect(0), cs = R.cssScale, ic = document.querySelector('.pv[data-i=\"0\"] .ic'); const mk = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.42, clientX: R.left + x * cs, clientY: R.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); ic.dispatchEvent(mk('pointerdown', 200, 200, 500)); for (let i = 1; i <= 4; i++) { const ev = mk('pointermove', 200 + i * 8, 200 + i * 4, 500); Object.defineProperty(ev, 'getPredictedEvents', { value: function () { return [{ clientX: 300, clientY: 300, pressure: 0.3 }]; } }); window.dispatchEvent(ev); } await new Promise(res => setTimeout(res, 150)); const predLen = liveStateOK(); function liveStateOK() { return null; } window.dispatchEvent(mk('pointerup', 235, 218, 500)); await new Promise(res => setTimeout(res, 300)); return JSON.stringify({ strokes: ZT.state().strokes, livePredLen: ZT.liveState() ? ZT.liveState().predLen : -1, errors: window.__ZT_ERRORS, ink: ZT.inkStats(0) }); })()"
+  }
+]
