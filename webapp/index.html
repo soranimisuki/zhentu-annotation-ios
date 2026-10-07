@@ -450,7 +450,7 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-radius:0}
   <div id="moreMenu" class="mmenu" hidden>
     <button id="mBackup">⬇ 备份全部数据（笔迹+生词）</button>
     <button id="mRestore">⬆ 恢复备份</button>
-    <button id="mDblErase" class="mon" title="笔尖/鼠标快速两下就自动在书写 ↔ 橡皮之间切换；关掉后双击就是普通书写"><span class="mtick" id="mDblMark">✔</span><span>双击切换橡皮擦</span></button>
+    <button hidden id="mDblErase" class="mon" title="已停用：快速小笔画会被误判成双击（2026-10-07 移除）"><span class="mtick" id="mDblMark">✔</span><span>双击切换橡皮擦（已停用）</span></button>
     <button id="mNoSel" class="mon" title="写作时禁止长按弹出「拷贝 / 翻译 / 共享」气泡与选中文本；查词模式的划选翻译不受影响"><span class="mtick" id="mNoSelMark">✔</span><span>书写时禁用长按选中</span></button>
     <button id="mHelp">❓ 使用说明</button>
   </div>
@@ -588,8 +588,7 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-radius:0}
     </ul>
     <h3>Apple Pencil 手势（iPad）</h3>
     <ul>
-      <li><b>切换橡皮的三种方式</b>：① 笔尖在屏幕上快速轻点两下（要快、位置要近）；② <b>右下角悬浮 ✒️/🧽 按钮</b>点一下即可来回切（长按可拖到顺手的位置，最可靠）；③ 顶部工具栏 🧽。</li>
-      <li><b>不想用"双击切橡皮"可以关掉</b>：点右上角 <b>⋯</b> 菜单 → <b>双击切换橡皮擦</b>，勾掉即可（前面那个 ✔ 会变成 ✕）。关掉之后笔尖/鼠标双击就只是普通书写，不会因为写太快误切到橡皮；要换橡皮用右下角悬浮按钮或工具条 🧽。这个选择会被记住。</li>
+      <li><b>切换橡皮的两种方式</b>：① <b>右下角悬浮 ✒️/🧽 按钮</b>点一下即可来回切（长按可拖到顺手的位置，最可靠）；② 顶部工具栏 🧽。在 iOS App 里还支持<b>笔杆轻点两下</b>（按系统设置 → Apple Pencil 的配置生效）。</li>
       <li><b>书写时不会再弹出"拷贝 / 翻译 / 共享"</b>：只要不是 🔍 查词模式，长按页面就不会唤起系统的选中气泡、也选不中正文（查词模式的划选翻译不受影响）。万一还想用系统那份：右上角 <b>⋯</b> 菜单 → <b>书写时禁用长按选中</b>，勾掉即可。</li>
       <li>为什么笔杆"轻点两下"没用？那是 iPadOS 转发给原生 App 的手势（PencilKit / UIPencilInteraction），Safari 不把它转发给网页，系统设置里怎么配对网页都无效——所以请用上面②号悬浮按钮。</li>
       <li><b>双指轻点屏幕</b>：撤销上一步；<b>双指拖动</b>：滚动页面；<b>双指张合</b>：缩放页面（放大后拖动可平移，点缩放标签「适宽/百分比」一键恢复适应宽度）。</li>
@@ -1006,35 +1005,11 @@ function timerReset(){
   timerSyncUI();
 })();
 function toggleEraser(){
-  lastToggleAt=performance.now();
   if(prefs.tool==="eraser"){setTool(lastDrawTool||"pen")}
   else{lastDrawTool=prefs.tool;setTool("eraser")}
   toast("已切换到："+TOOL_NAME[prefs.tool]);
 }
-/* 增强版：双击切换橡皮的开关（右上角 ⋯ 菜单里可关）
-   注意只有"双击"路径受控；右下角悬浮按钮、工具条 🧽 始终可用 */
-function toggleEraserByDbl(){
-  /* iOS App 内一律禁用"笔尖快速两下"检测：原生 UIPencilInteraction 已接管笔杆双击。
-     小字快速书写时，短促小笔画（<240ms 且位移 <7px）恰好符合"轻点"特征，
-     下一笔落在 650ms/40px 窗口内就被误判成双击——切去橡皮+删掉上一笔，
-     手感正是"第二笔写不出来、第三笔才出来"（2026-10-07 用户实测定位）。
-     App 里的兜底：笔杆双击（原生）+ 右下角悬浮快切按钮 + 工具条 🧽。 */
-  if(SHELL)return false;
-  if(!prefs.dblEraser)return false;
-  toggleEraser();return true;
-}
-function syncDblEraseBtn(){
-  var b=$("mDblErase"),m=$("mDblMark");
-  if(!b||!m)return;
-  m.textContent=prefs.dblEraser?"✔":"✕";
-  m.style.color=prefs.dblEraser?"#2563eb":"#94a3b8";
-  b.setAttribute("aria-checked",prefs.dblEraser?"true":"false");
-}
-var lastToggleAt=0;
-/* Safari 若把铅笔双击转发成 dblclick 也能切换（防与自研检测重复触发） */
-window.addEventListener("dblclick",function(){
-  if(lastPointerType==="pen"&&performance.now()-lastToggleAt>=450)toggleEraserByDbl();
-});
+/* （2026-10-07 移除"双击切换橡皮擦"：见 onDown 处说明——检测窗口与连续写小字无法区分。 */
 /* ===== 增强版：书写类模式下彻底关掉"长按选中"（iPad 的 拷贝/翻译/共享 气泡）=====
    CSS 已经把 #pagesWrap 整棵子树设成 user-select:none + touch-callout:none，
    但 iOS 的原生长按选词 / 图片 Live Text 有时会抢在样式之前起来，
@@ -1700,20 +1675,11 @@ function onDown(e){
   try{pin.setPointerCapture(e.pointerId)}catch(err){}
   var pt=evtPt(pv,e);
   clearSEL(pv);
-  /* 铅笔双击 → 切换橡皮/原工具（任何工具下都生效，按屏幕坐标判定）
-     注：笔杆"轻点两下"系统手势 Safari 不转发给网页，这里检测的是
-     笔尖在屏幕上快速两下；系统若吞掉第二下则由悬浮按钮兜底 */
   var now=performance.now();
-  if(e.pointerType==="pen"&&now-lastPenTap.t<650&&Math.hypot(e.clientX-lastPenTap.cx,e.clientY-lastPenTap.cy)<40){
-    var switched=toggleEraserByDbl();   /* 增强版：关掉开关时双击=普通书写，第一下落的墨点也不删 */
-    if(switched){
-      if(lastPenTap.stroke)removeStrokeByRef(lastPenTap.pi,lastPenTap.stroke);
-      lastPenTap={t:0,stroke:null};
-      live={mode:"ignore",pv:pv,pid:e.pointerId,stroke:null,t0:0,sx:0,sy:0,moved:0};
-      return;
-    }
-    lastPenTap={t:0,stroke:null};
-  }
+  /* （2026-10-07 移除"笔尖快速两下切橡皮"检测）点/小线段开笔恰好构成"轻点"特征，
+     下一笔落在 650ms/40px 窗口内就被误判成双击——切去橡皮+删掉上一笔，
+     网页版和 App 全中招（用户实证：第一笔是点或小线段必卡）。无法与"连续写小字"区分，
+     整个检测移除。换橡皮：右下角悬浮按钮 / 工具条 🧽 / App 内笔杆轻点两下（原生 UIPencilInteraction）。 */
   if(t==="eraser"){live={mode:"ers",pv:pv,pid:e.pointerId,stroke:null,t0:performance.now(),sx:e.clientX,sy:e.clientY,moved:0,rc:pin.getBoundingClientRect()};eraseAt(pv,pt.x,pt.y);return}
   /* 增强版：框选工具的自由圈选；书写模式下落在已有闭合圈上则进入长按套索待判
      （放在铅笔双击判定之后，笔杆双击切橡皮的手感不受影响） */
@@ -1758,8 +1724,9 @@ function onMove(e){
     schedulePaint(pv); /* 圈只是临时 UI，不必重建底图 */
     return;
   }
-  /* 增强版：长按闭合圈待判——手一动就放弃长按，回到本来该做的事（写字/拉框） */
+  /* 增强版：长按闭合圈待判——手一动就放弃长按，回到本来该做的事（拉框） */
   if(live.mode==="lz"){
+    if(!LASSO){live.mode=null;e.preventDefault();return} /* 套索计时已触发：本次按压作废，别再解引用 null（2026-10-07） */
     if(Math.hypot(e.clientX-LASSO.cx,e.clientY-LASSO.cy)>LASSO_MOVE){msResumeFromLasso(pv,e);return}
     e.preventDefault();
     return;
@@ -2754,14 +2721,7 @@ function backupAll(){
   $("mBackup").addEventListener("click",function(){menu.hidden=true;backupAll()});
   $("mRestore").addEventListener("click",function(){menu.hidden=true;if(SHELL)shellImport("bak");else $("bakFile").click()});
   $("mHelp").addEventListener("click",function(){menu.hidden=true;$("help").hidden=false});
-  /* 增强版：双击切换橡皮擦的开关 */
-  $("mDblErase").addEventListener("click",function(){
-    prefs.dblEraser=!prefs.dblEraser;savePrefs();syncDblEraseBtn();
-    toast(prefs.dblEraser
-      ? "已开启「双击切换橡皮擦」：笔尖（或鼠标）快速两下就在书写 ↔ 橡皮之间切"
-      : "已关闭「双击切换橡皮擦」：双击就是普通书写；换橡皮请点右下角悬浮按钮或工具条 🧽",3200);
-  });
-  syncDblEraseBtn();
+  /* （2026-10-07 移除"双击切换橡皮擦"开关——功能整体下线，见 onDown 处说明） */
   /* 增强版：书写时禁用长按选中（iPad 气泡）的开关 */
   $("mNoSel").addEventListener("click",function(){
     prefs.noSelect=!prefs.noSelect;savePrefs();syncNoSelBtn();
@@ -3541,7 +3501,7 @@ window.ZT={
   /* ===== 增强版：框选 / 套索 ===== */
   msTool:function(v){if(v!==undefined){setTool(v?"marquee":"select")}return prefs.tool==="marquee"},
   dblEraser:function(v){
-    if(v!==undefined){prefs.dblEraser=!!v;savePrefs();syncDblEraseBtn()}
+    if(v!==undefined){prefs.dblEraser=!!v;savePrefs()} /* 兼容旧脚本；检测本体已于 2026-10-07 移除 */
     return !!prefs.dblEraser;
   },
   msel:function(){return MSELS?{pi:MSELS.pi,n:MSELS.items.length,
@@ -3690,12 +3650,7 @@ function runSelftest(){
     var a=msBox({t:"p",c:0,w:2,pts:[10,10,.5,30,40,.5]}),b=msBox({t:"p",c:0,w:2,pts:[50,5,.5,55,9,.5]});
     return msUnion(a,b).x1>=55&&msUnion(a,b).x0<=10;})());
   ck("增强·长方形/直线笔迹包围盒",msBox({t:"g",k:"line",c:0,w:2,pts:[40,10,10,50]}).x0===10);
-  ck("增强·双击切橡皮开关存在",!!$("mDblErase")&&!!$("mDblMark"));
-  ck("增强·双击切橡皮默认开",prefs.dblEraser===true&&typeof toggleEraserByDbl==="function");
-  var _oldDbl=prefs.dblEraser;prefs.dblEraser=false;
-  var _blocked=toggleEraserByDbl()===false;
-  prefs.dblEraser=_oldDbl;
-  ck("增强·关掉后双击不再切橡皮",_blocked&&prefs.dblEraser===_oldDbl);
+  ck("增强·笔尖双击检测已移除（防误伤点/小线段开笔）",typeof toggleEraserByDbl!=="function"&&$("mDblErase").hidden===true);
   /* D：书写时禁用长按选中 + 渲染性能相关 */
   ck("增强·禁用长按选中开关存在",!!$("mNoSel")&&!!$("mNoSelMark"));
   ck("增强·禁用长按选中默认开",prefs.noSelect===true);
@@ -4256,6 +4211,7 @@ function msArmLasso(e,pv,pt,loopSt){
   if(lassoTimer)clearTimeout(lassoTimer);
   lassoTimer=setTimeout(function(){
     lassoTimer=0;LASSO=null;
+    live.mode=null;live.stroke=null; /* 套索生效＝本次按压结束：笔还按着时后续 move 不再进 lz 分支 */
     msDoLasso(pv,loopSt);
   },LASSO_MS);
   live={mode:"lz",pv:pv,pid:e.pointerId,stroke:null,t0:performance.now(),sx:e.clientX,sy:e.clientY,moved:0};
@@ -4316,12 +4272,14 @@ function msResumeFromLasso(pv,e){
 function tryMetaDown(e,pv){
   var t=prefs.tool;
   if(t!=="marquee"&&MSELS)clearMSEL();   /* 一开始写字就取消多选高亮 */
-  if(t!=="marquee"&&t!=="pen")return false;
-  if(t==="marquee"&&msDown(e,pv))return true;
+  if(t!=="marquee")return false; /* 书写类工具一律不接管（2026-10-07）：书写模式落在自己画的
+      闭合圈上会进"长按套索待判"，套索 500ms 计时到点把 LASSO 置空而 lz 模式未退，
+      后续每个 move 都抛 TypeError（错误陷阱 @index.html:1763 实锤）——整笔被吞，
+      是"第二笔写不出来"在 IPA 侧的真凶。要圈选/长按套索请用 ⬚ 框选工具。 */
+  if(msDown(e,pv))return true;
   var pt=evtPt(pv,e),loopSt=msLoopAt(pv,pt);
   if(loopSt){msArmLasso(e,pv,pt,loopSt);return true}
-  if(t==="marquee"){msFreeDown(e,pv);return true}
-  return false;
+  msFreeDown(e,pv);return true;
 }
 /* ---------- B-4：手绘笔画 → 规则图形的识别 ---------- */
 function clearSnapDwell(){if(snapTimer){clearTimeout(snapTimer);snapTimer=0}}

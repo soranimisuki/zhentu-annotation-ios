@@ -36,7 +36,7 @@ final class MainViewController: UIViewController,
         // 构建号：页面启动时 toast 出来，用户截图即可确认装的是哪个包（排查"修复没生效"）。
         // __ZT_PRED=0：真机排障期关闭预测墨迹——桌面主文件（无预测）书写正常，先消除唯一页面差异。
         let boot = WKUserScript(
-            source: "window.__ZT_SHELL=1;window.__ZT_PRED=0;window.__ZT_SHELL_BUILD='build-20261007-2200';",
+            source: "window.__ZT_SHELL=1;window.__ZT_PRED=0;window.__ZT_SHELL_BUILD='build-20261007-2300';",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "open-blank-pdf",
+    "awaitPromise": true,
+    "waitMs": 1200,
+    "expr": "(async () => { const d = await PDFLib.PDFDocument.create(); d.addPage([595, 842]); const b = await d.save(); await ZT.openB64(ZT.b64(b), 'fx.pdf'); return 'opened shell=' + window.__ZT_SHELL; })()"
+  },
+  {
+    "name": "dot-then-small-stroke",
+    "awaitPromise": true,
+    "waitMs": 400,
+    "expr": "(async () => { ZT.setTool('pen'); const R = ZT.pageRect(0), cs = R.cssScale, ic = document.querySelector('.pv[data-i=\"0\"] .ic'); const mk = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.42, clientX: R.left + x * cs, clientY: R.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); ic.dispatchEvent(mk('pointerdown', 200, 200, 700)); window.dispatchEvent(mk('pointermove', 202, 201, 700)); window.dispatchEvent(mk('pointerup', 203, 202, 700)); await new Promise(res => setTimeout(res, 100)); const s1 = ZT.state().strokes, t1 = ZT.state().tool; ic.dispatchEvent(mk('pointerdown', 210, 205, 701)); window.dispatchEvent(mk('pointermove', 213, 207, 701)); window.dispatchEvent(mk('pointerup', 214, 208, 701)); await new Promise(res => setTimeout(res, 100)); return JSON.stringify({ s1: s1, t1: t1, s2: ZT.state().strokes, t2: ZT.state().tool, errors: window.__ZT_ERRORS }); })()"
+  },
+  {
+    "name": "pen-down-on-old-loop-writes",
+    "awaitPromise": true,
+    "waitMs": 300,
+    "expr": "(async () => { ZT.setTool('pen'); const ic = document.querySelector('.pv[data-i=\"0\"] .ic'); const R = ZT.pageRect(0), cs = R.cssScale; const mk = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.4, clientX: R.left + x * cs, clientY: R.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); const pts = ZT.mockLoopPts('circle', 46, 1); ic.dispatchEvent(mk('pointerdown', pts[0][0], pts[0][1], 710)); for (let i = 1; i < pts.length; i++) window.dispatchEvent(mk('pointermove', pts[i][0], pts[i][1], 710)); await new Promise(res => setTimeout(res, 950)); window.dispatchEvent(mk('pointerup', pts[pts.length - 1][0], pts[pts.length - 1][1], 710)); await new Promise(res => setTimeout(res, 200)); const kind = (ZT.lastStroke(0) || {}).k; const before = ZT.state().strokes; ic.dispatchEvent(mk('pointerdown', 100, 100, 711)); for (let i = 1; i <= 5; i++) window.dispatchEvent(mk('pointermove', 100 + i * 6, 100 + i * 4, 711)); await new Promise(res => setTimeout(res, 650)); window.dispatchEvent(mk('pointermove', 135, 125, 711)); window.dispatchEvent(mk('pointerup', 136, 126, 711)); await new Promise(res => setTimeout(res, 300)); return JSON.stringify({ convertedFirst: kind, strokesBeforeSecond: before, strokesAfter: ZT.state().strokes, tool: ZT.state().tool, errors: window.__ZT_ERRORS, lastOK: !!(ZT.lastStroke(0) && ZT.lastStroke(0).t === 'p') }); })()"
+  },
+  {
+    "name": "marquee-lasso-timer-no-throw",
+    "awaitPromise": true,
+    "waitMs": 300,
+    "expr": "(async () => { ZT.setTool('marquee'); const ic = document.querySelector('.pv[data-i=\"0\"] .ic'); const R = ZT.pageRect(0), cs = R.cssScale; const mk = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.4, clientX: R.left + x * cs, clientY: R.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); const before = window.__ZT_ERRORS.length; ic.dispatchEvent(mk('pointerdown', 100, 100, 720)); await new Promise(res => setTimeout(res, 700)); for (let i = 1; i <= 6; i++) window.dispatchEvent(mk('pointermove', 100 + i * 5, 100, 720)); window.dispatchEvent(mk('pointerup', 130, 100, 720)); await new Promise(res => setTimeout(res, 250)); return JSON.stringify({ newErrors: window.__ZT_ERRORS.slice(before), tool: ZT.state().tool }); })()"
+  }
+]
