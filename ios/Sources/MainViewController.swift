@@ -41,7 +41,6 @@ final class MainViewController: UIViewController,
         cfg.userContentController.addUserScript(boot)
         cfg.userContentController.add(self, name: "ztBridge")
         cfg.allowsInlineMediaPlayback = true
-        cfg.mediaTypesRequiringUserAction = []
 
         web = WKWebView(frame: view.bounds, configuration: cfg)
         web.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -192,8 +191,8 @@ final class MainViewController: UIViewController,
     ) {
         let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
         alert.addTextField { $0.text = defaultText }
-        alert.addAction(UIAlertAction(title: "确定", style: .default) { a in
-            completionHandler(a.textFields?.first?.text)
+        alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
+            completionHandler(alert.textFields?.first?.text)
         })
         alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in completionHandler(nil) })
         presentSheet(alert, tag: "prompt")
@@ -219,7 +218,7 @@ final class MainViewController: UIViewController,
 
     // MARK: - Apple Pencil 轻点两下
 
-    func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveTap tap: UIPencilInteractionTap) {
+    func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveTap tap: UIPencilInteraction.Tap) {
         let pref = UIPencilInteraction.preferredTapAction
         var name: String
         switch pref {

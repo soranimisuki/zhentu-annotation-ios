@@ -114,7 +114,7 @@ final class LocalServer: NSObject {
                 contentType = "text/plain"
             }
         } else if req.method == "POST" && req.path == "/__zt/export" {
-            let name = sanitizeFilename(req.query["name"] ?? "export.pdf")
+            let name = Self.sanitizeFilename(req.query["name"] ?? "export.pdf")
             if exportSaver?(req.body, name) == true {
                 contentType = "text/plain"
                 body = Data("ok".utf8)
