@@ -156,11 +156,9 @@ src = rep(src,
           '  var urls=["vendor/pdf.worker.min.js",WORKER_JSDELIVR,WORKER_UNPKG];',
           tag="vendor-worker")
 
-# ---------- 5a. desynchronized 低延迟画布 ----------
-src = rep(src,
-          '  pv.ictx=pv.ic.getContext("2d");',
-          '  pv.ictx=pv.ic.getContext("2d",{desynchronized:true}); /* iOS18.2+ 低延迟提示，旧系统自动忽略 */',
-          tag="desynchronized")
+# ---------- 5a. （已撤）desynchronized 低延迟画布 ----------
+# 2026-10-07 撤：WebKit 对 desynchronized 的实现不透明，App 端实测反馈卡顿后回归保守路线。
+# 顺滑化只保留预测墨迹（getPredictedEvents，纯增量、不进数据）。
 
 # ---------- 5b. live 状态加预测字段 ----------
 src = rep(src,

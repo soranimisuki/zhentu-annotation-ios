@@ -692,7 +692,13 @@ var D=null,docKey="",docLabel="";
 var saveDTimer=0;
 function scheduleSaveD(){
   clearTimeout(saveDTimer);
-  saveDTimer=setTimeout(function(){if(docKey)store.set("zt_doc::"+docKey,D)},400);
+  saveDTimer=setTimeout(saveDNow,400);
+}
+/* 落盘推迟到手离开屏幕之后：JSON 序列化+localStorage 写入是同步大活，
+   恰好赶在两笔之间执行，手感就是"写完一笔得停顿一下才能写下一笔"（2026-10-07 用户反馈） */
+function saveDNow(){
+  if(live&&live.mode){saveDTimer=setTimeout(saveDNow,300);return}
+  if(docKey)store.set("zt_doc::"+docKey,D)
 }
 function flushSave(){clearTimeout(saveDTimer);if(docKey)store.set("zt_doc::"+docKey,D)}
 function pageData(i){var p=D.pages[i];if(!p){p={s:[],c:[]};D.pages[i]=p}if(!p.s)p.s=[];if(!p.c)p.c=[];return p}
@@ -1247,7 +1253,7 @@ function syncInk(pv){
   var W=Math.max(1,Math.floor(vp1.width*k)),H=Math.max(1,Math.floor(vp1.height*k));
   pv.ic.width=W;
   pv.ic.height=H;
-  pv.ictx=pv.ic.getContext("2d",{desynchronized:true}); /* iOS18.2+ 低延迟提示，旧系统自动忽略 */
+  pv.ictx=pv.ic.getContext("2d");
   pv.ictx.setTransform(k,0,0,k,0,0);
   pv.icK=k;
   /* 增强版：笔迹"底图"缓存（避免每个 pointermove 都重描整页笔迹）。
@@ -1295,6 +1301,7 @@ var io=("IntersectionObserver" in window)?new IntersectionObserver(function(ents
    空白页不建位图缓存 —— 省掉一份全分辨率画布的内存（iPad 上很要紧）。 */
 function rebuildInkBase(pv){
   if(!pv)return;
+  pv.baseExcl=null; /* 多选手势的"去选区底图"随任何重建作废 */
   if(window.__perf)window.__perf.rebuild=(window.__perf.rebuild||0)+1; /* 仅供自动化统计 */
   var vp1=S.vp1[pv.i];if(!vp1)return;
   var pg=D&&D.pages[pv.i];
@@ -1320,17 +1327,48 @@ function compositeInk(pv){
   if(window.__perf)window.__perf.composite=(window.__perf.composite||0)+1; /* 仅供自动化统计 */
   var ctx=pv.ictx,k=pv.icK||renderK(pv);
   var useBase=!!(pv.base&&pv.bctx&&pv.baseK===k&&pv.base.width===pv.ic.width&&pv.base.height===pv.ic.height);
+  /* 多选移动/缩放期间：底图换成"去掉选区"的 baseExcl，选中的几笔按当前数据叠画在上层。
+     手势中绝不重建整页底图（那是多选卡顿的根源，2026-10-07 用户反馈） */
+  var gestSel=!!(live&&(live.mode==="mv"||live.mode==="msz")&&MSELS&&MSELS.pi===pv.i&&pv.baseExcl&&pv.baseExclK===k);
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,pv.ic.width,pv.ic.height);
-  if(useBase)ctx.drawImage(pv.base,0,0);
+  if(gestSel)ctx.drawImage(pv.baseExcl,0,0);
+  else if(useBase)ctx.drawImage(pv.base,0,0);
   ctx.setTransform(k,0,0,k,0,0);
-  if(!useBase){
+  if(gestSel){
+    for(var gi=0;gi<MSELS.items.length;gi++)drawStroke(ctx,MSELS.items[gi]);
+  }else if(!useBase){
     var pg=D&&D.pages[pv.i];
     if(pg&&pg.s)for(var i=0;i<pg.s.length;i++)drawStroke(ctx,pg.s[i]);
   }
   drawSentHl(pv);      /* 增强版：句子翻译的临时高亮（不落盘） */
   drawShapeSelUI(pv);  /* 增强版：规则图形的选中框与控制点（不落盘） */
   msDrawUI(pv);        /* 增强版：多选虚线框 / 选框 / 待触发的圈（不落盘） */
+}
+/* 多选手势专用底图：只画"未被选中"的笔迹，手势开始时建一次。
+   分配/尺寸与主底图同一套规则；手势结束（finish/abort）随 rebuildInkBase 作废。 */
+function buildBaseExcl(pv){
+  var vp1=S.vp1[pv.i];if(!vp1||!MSELS||MSELS.pi!==pv.i)return;
+  var k=pv.icK||renderK(pv);
+  if(!pv.baseExcl)pv.baseExcl=document.createElement("canvas");
+  pv.baseExcl.width=Math.max(1,Math.floor(vp1.width*k));
+  pv.baseExcl.height=Math.max(1,Math.floor(vp1.height*k));
+  pv.baseExclK=k;
+  var ctx=pv.baseExcl.getContext("2d");
+  var pg=D.pages[pv.i],sel=MSELS.items;
+  ctx.setTransform(k,0,0,k,0,0);
+  if(pg&&pg.s)for(var i=0;i<pg.s.length;i++)if(sel.indexOf(pg.s[i])<0)drawStroke(ctx,pg.s[i]);
+}
+/* 收笔增量叠底图：只把刚落库的这一笔画进现有底图（O(1)）。
+   底图缺失/尺寸不匹配时返回 false，由调用方整页重建。
+   原来每收一笔都 rebuildInkBase 整页重描，页上笔迹一多，
+   收笔到下一笔之间就卡出一截——这是"写完一笔要停顿"的主因（2026-10-07）。 */
+function appendInkBase(pv,st){
+  var k=pv.icK||renderK(pv);
+  if(!(pv.base&&pv.bctx&&pv.baseK===k&&pv.base.width===pv.ic.width&&pv.base.height===pv.ic.height))return false;
+  pv.bctx.setTransform(k,0,0,k,0,0);
+  drawStroke(pv.bctx,st);
+  return true;
 }
 function redrawInk(pv){
   if(!pv.ictx)return;
@@ -1847,7 +1885,8 @@ function commitStroke(pv,st){
   undoStack.push({k:"add",pi:pv.i,st:st});redoStack.length=0;
   if(undoStack.length>200)undoStack.shift();
   scheduleSaveD();
-  redrawInk(pv);
+  if(!appendInkBase(pv,st))rebuildInkBase(pv);
+  compositeInk(pv);
 }
 function removeStrokeByRef(pi,st){
   var pg=D.pages[pi];if(!pg||!pg.s)return;
@@ -4066,6 +4105,8 @@ function msFinish(){
   if(!changed){var ix=undoStack.indexOf(op);if(ix>=0)undoStack.splice(ix,1)}
   else scheduleSaveD();
   live.op=null;
+  /* 手势期间走的是 baseExcl 快照渲染（没整页重描），收尾重建一次正常底图 */
+  if(live.pv)redrawInk(live.pv);
 }
 function msAbort(){
   var op=live.op;
@@ -4082,7 +4123,7 @@ function msMoveScale(pv,pt){
     var dx=pt.x-live.sx,dy=pt.y-live.sy;
     live.base.items.forEach(function(b){var p=b.st.pts,q=b.pts,i;
       for(i=0;i<q.length;i+=3){p[i]=r1(q[i]+dx);p[i+1]=r1(q[i+1]+dy)}});
-    msRecomputeBox();redrawInk(pv);scheduleSaveD();
+    msRecomputeBox();
   }else if(live.mode==="msz"){
     var B=live.base.box,hi=live.hi,MIN=Math.max(2,3/pv.cssScale);
     var nx=pt.x,ny=pt.y,ax=B.x0,ay=B.y0,bx=B.x1,by=B.y1;
@@ -4092,8 +4133,11 @@ function msMoveScale(pv,pt){
     var kx=(bx-ax)/Math.max(MIN,B.x1-B.x0),ky=(by-ay)/Math.max(MIN,B.y1-B.y0);
     live.base.items.forEach(function(b){var p=b.st.pts,q=b.pts,i;
       for(i=0;i<q.length;i+=3){p[i]=r1(ax+(q[i]-B.x0)*kx);p[i+1]=r1(ay+(q[i+1]-B.y0)*ky)}});
-    msRecomputeBox();redrawInk(pv);scheduleSaveD();
+    msRecomputeBox();
   }
+  /* rAF 合帧重画（baseExcl 快照 + 选中笔迹），不再每个 move 事件整页重描+落盘
+     ——多选移动/缩放卡顿的根源（2026-10-07 用户反馈）；落盘交给 msFinish */
+  schedulePaint(pv);
 }
 /* 已有选区：拖角=整体缩放，拖内部=整体移动（仅 ⬚ 框选 工具） */
 function msDown(e,pv){
@@ -4105,6 +4149,7 @@ function msDown(e,pv){
   e.preventDefault();
   try{pv.pin.setPointerCapture(e.pointerId)}catch(err){}
   var op=msBeginOp(pv);
+  buildBaseExcl(pv); /* 手势期间用"去选区"快照渲染，抬手才整页重建 */
   live={mode:hi>=0?"msz":"mv",pv:pv,pid:e.pointerId,stroke:null,hi:hi,
         t0:performance.now(),sx:pt.x,sy:pt.y,moved:0,op:op,
         base:{box:{x0:MSELS.box.x0,y0:MSELS.box.y0,x1:MSELS.box.x1,y1:MSELS.box.y1},

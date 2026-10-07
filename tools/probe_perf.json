@@ -1,0 +1,36 @@
+[
+  {
+    "name": "open-blank-pdf",
+    "awaitPromise": true,
+    "waitMs": 1200,
+    "expr": "(async () => { const d = await PDFLib.PDFDocument.create(); d.addPage([595, 842]); const b = await d.save(); await ZT.openB64(ZT.b64(b), 'perf.pdf'); return 'opened:' + ZT.state().pages; })()"
+  },
+  {
+    "name": "prep-perf-counters",
+    "expr": "ZT.setTool('pen'); window.__perf = { rebuild: 0, composite: 0 }; window.__pf = {}; const r = ZT.pageRect(0); window.__pf.rect = r; window.__pf.ic = document.querySelector('.pv[data-i=\"0\"] .ic'); 'ok'"
+  },
+  {
+    "name": "draw-120-strokes",
+    "awaitPromise": true,
+    "waitMs": 300,
+    "expr": "(async () => { const down = (x, y) => window.__pf.ic.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 55, isPrimary: true, pressure: 0.45, clientX: x, clientY: y, buttons: 1 })); const mv = (x, y) => window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 55, isPrimary: true, pressure: 0.45, clientX: x, clientY: y, buttons: 1 })); const up = (x, y) => window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 55, isPrimary: true, pressure: 0.3, clientX: x, clientY: y, buttons: 0 })); const R = window.__pf.rect, cs = R.cssScale; const t0 = performance.now(); for (let s = 0; s < 120; s++) { const x0 = R.left + (170 + (s % 12) * 24) * cs, y0 = R.top + (130 + Math.floor(s / 12) * 22) * cs; down(x0, y0); for (let i = 1; i <= 5; i++) mv(x0 + i * 14 * cs, y0 + i * 3 * cs); up(x0 + 70 * cs, y0 + 15 * cs); } const ms = performance.now() - t0; window.__pf.after120 = { ms: Math.round(ms), rebuild: window.__perf.rebuild, composite: window.__perf.composite, strokes: ZT.state().strokes }; return JSON.stringify(window.__pf.after120); })()"
+  },
+  {
+    "name": "lasso-select",
+    "awaitPromise": true,
+    "waitMs": 400,
+    "expr": "(async () => { ZT.setTool('marquee'); const R = window.__pf.rect, cs = R.cssScale; const ic = window.__pf.ic; const P = (x, y) => [R.left + x * cs, R.top + y * cs]; let p = P(150, 100); ic.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 56, isPrimary: true, pressure: 0.4, clientX: p[0], clientY: p[1], buttons: 1 })); const seq = []; for (let i = 0; i <= 8; i++) seq.push([150 + i * 40, 100]); for (let i = 0; i <= 8; i++) seq.push([470, 100 + i * 40]); for (let i = 0; i <= 8; i++) seq.push([470 - i * 40, 420]); for (let i = 0; i <= 8; i++) seq.push([150, 420 - i * 40]); seq.forEach(q => { p = P(q[0], q[1]); window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 56, isPrimary: true, pressure: 0.4, clientX: p[0], clientY: p[1], buttons: 1 })); }); window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 56, isPrimary: true, pressure: 0.3, clientX: p[0], clientY: p[1], buttons: 0 })); await new Promise(res => setTimeout(res, 100)); window.__pf.selSnap = JSON.parse(JSON.stringify(ZT.docStore())); return 'selected, rebuilds=' + window.__perf.rebuild; })()"
+  },
+  {
+    "name": "move-gesture-25-events",
+    "awaitPromise": true,
+    "waitMs": 500,
+    "expr": "(async () => { const R = window.__pf.rect, cs = R.cssScale; const ic = window.__pf.ic; const P = (x, y) => [R.left + x * cs, R.top + y * cs]; const before = window.__perf.rebuild; let p = P(300, 300); ic.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 57, isPrimary: true, pressure: 0.4, clientX: p[0], clientY: p[1], buttons: 1 })); const t0 = performance.now(); for (let i = 1; i <= 25; i++) { p = P(300 + i * 6, 300); window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 57, isPrimary: true, pressure: 0.4, clientX: p[0], clientY: p[1], buttons: 1 })); } const ms = performance.now() - t0; const during = window.__perf.rebuild - before; window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 57, isPrimary: true, pressure: 0.3, clientX: p[0], clientY: p[1], buttons: 0 })); await new Promise(res => setTimeout(res, 150)); return JSON.stringify({ moveMs: Math.round(ms), rebuildsDuringMove: during, rebuildsAfterUp: window.__perf.rebuild - before - during, totalRebuilds: window.__perf.rebuild }); })()"
+  },
+  {
+    "name": "scale-gesture-corner",
+    "awaitPromise": true,
+    "waitMs": 500,
+    "expr": "(async () => { const R = window.__pf.rect, cs = R.cssScale; const ic = window.__pf.ic; const P = (x, y) => [R.left + x * cs, R.top + y * cs]; const before = window.__perf.rebuild; let p = P(300, 100); ic.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 58, isPrimary: true, pressure: 0.4, clientX: p[0], clientY: p[1], buttons: 1 })); const t0 = performance.now(); for (let i = 1; i <= 20; i++) { p = P(300 - i * 4, 100 - i * 2); window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 58, isPrimary: true, pressure: 0.4, clientX: p[0], clientY: p[1], buttons: 1 })); } const ms = performance.now() - t0; const during = window.__perf.rebuild - before; window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: 58, isPrimary: true, pressure: 0.3, clientX: p[0], clientY: p[1], buttons: 0 })); await new Promise(res => setTimeout(res, 150)); const moved = JSON.stringify(ZT.docStore()) !== JSON.stringify(window.__pf.selSnap); return JSON.stringify({ scaleMs: Math.round(ms), rebuildsDuringScale: during, dataChanged: moved, ink: ZT.inkStats(0) }); })()"
+  }
+]
