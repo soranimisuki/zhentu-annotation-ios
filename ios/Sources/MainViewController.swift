@@ -272,13 +272,20 @@ final class MainViewController: UIViewController,
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         guard let dir = docs?.appendingPathComponent("exports", isDirectory: true) else { return nil }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appendingPathComponent(LocalServer.sanitizeFilename(name))
-        do {
-            try data.write(to: url, options: .atomic)
-            return url
-        } catch {
-            return nil
+        let safe = LocalServer.sanitizeFilename(name)
+        // 主名写失败（异常字符/占用等）→ 回退到时间戳名再试一次
+        let ext = (safe as NSString).pathExtension
+        let fallback = "export-" + String(Int(Date().timeIntervalSince1970)) + (ext.isEmpty ? "" : "." + ext)
+        for fn in [safe, fallback] {
+            let url = dir.appendingPathComponent(fn)
+            do {
+                try data.write(to: url, options: .atomic)
+                return url
+            } catch {
+                continue
+            }
         }
+        return nil
     }
 
     private func presentExport(name: String) {

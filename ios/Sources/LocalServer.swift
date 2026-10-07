@@ -113,6 +113,13 @@ final class LocalServer: NSObject {
                 body = Data("no pending inbox".utf8)
                 contentType = "text/plain"
             }
+        } else if req.method == "GET" && req.path == "/__zt/ping" {
+            contentType = "text/plain"
+            body = Data("pong".utf8)
+        } else if req.method == "GET" && req.path == "/__zt/log" {
+            status = "200 OK"
+            contentType = "text/plain; charset=utf-8"
+            body = Data(logLines.joined(separator: "\n").utf8)
         } else if req.method == "POST" && req.path == "/__zt/export" {
             let name = Self.sanitizeFilename(req.query["name"] ?? "export.pdf")
             if exportSaver?(req.body, name) == true {
@@ -126,14 +133,25 @@ final class LocalServer: NSObject {
         } else {
             status = "404 Not Found"
             contentType = "text/plain"
-            body = Data("not found".utf8)
+            body = Data(("not found: " + req.method + " " + req.path).utf8)
         }
 
+        logReq("\(req.method) \(req.path) -> \(status) (\(body.count)B)")
         let head = "HTTP/1.1 \(status)\r\nContent-Type: \(contentType)\r\n"
             + "Content-Length: \(body.count)\r\nCache-Control: no-store\r\nConnection: keep-alive\r\n\r\n"
         var resp = Data(head.utf8)
         resp.append(body)
         conn.send(content: resp, completion: .contentProcessed { _ in })
+    }
+
+    // 请求日志（环形，最近 60 条）：页面在导入/导出失败时拉 /__zt/log 放进 toast，
+    // 用户截图即可定位是请求没到服务器还是落盘/取件失败。
+    private var logLines: [String] = []
+    private func logReq(_ s: String) {
+        let df = DateFormatter()
+        df.dateFormat = "HH:mm:ss"
+        logLines.append(df.string(from: Date()) + " " + s)
+        if logLines.count > 60 { logLines.removeFirst(logLines.count - 60) }
     }
 
     private func tryLoad(_ url: URL) -> Data {
@@ -148,11 +166,13 @@ final class LocalServer: NSObject {
     }
 
     static func sanitizeFilename(_ s: String) -> String {
-        var t = s.replacingOccurrences(of: "/", with: "_")
-        t = t.replacingOccurrences(of: "\\", with: "_")
+        var t = s
+        // iOS 文件名的非法字符（冒号最常见：文件名带时间 "21:30" 会让 write 直接抛错）
+        let bad = CharacterSet(charactersIn: "/\\:?%*|\"<>\0")
+        t = String(t.unicodeScalars.filter { !bad.contains($0) })
         t = t.replacingOccurrences(of: "..", with: "_")
         t = t.trimmingCharacters(in: .whitespacesAndNewlines)
-        if t.isEmpty { t = "export.pdf" }
+        if t.isEmpty { t = "export" }
         return t
     }
 

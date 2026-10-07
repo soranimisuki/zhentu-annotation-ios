@@ -63,13 +63,25 @@ function shellImport(kind){
   try{window.webkit.messageHandlers.ztBridge.postMessage({type:"import",kind:kind})}
   catch(e){toast("导入桥不可用："+(e&&e.message||e))}
 }
+/* 失败诊断：把本地服务器最近请求日志尾带进 toast（2026-10-07 用户报桥失败，先补可观测性） */
+function shellLogToast(msg,ms){
+  fetch("/__zt/log").then(function(l){return l.text()}).then(function(t){
+    toast(msg+"｜服务器: "+t.slice(-180).replace(/\\n/g," ⏎ "),ms||9000);
+  },function(){toast(msg,ms||6000)});
+}
 function shellSendExport(name,blob){
   showLoading("正在交给系统保存…");
   fetch("/__zt/export?name="+encodeURIComponent(name),{method:"POST",body:blob}).then(function(r){
     hideLoading();
-    if(!r.ok){toast("导出桥失败 HTTP "+r.status);return}
+    if(!r.ok){
+      r.text().then(function(t){shellLogToast("导出桥失败 HTTP "+r.status+" "+t)},function(){toast("导出桥失败 HTTP "+r.status,6000)});
+      return;
+    }
     try{window.webkit.messageHandlers.ztBridge.postMessage({type:"exported",name:name})}catch(e){}
-  },function(e){hideLoading();toast("导出桥失败："+(e&&e.message||e))});
+  },function(e){
+    hideLoading();
+    shellLogToast("导出桥失败："+(e&&e.message||e));
+  });
 }
 /* 原生导入回灌：壳把文件放进 /__zt/inbox，这里取回构造 File 走既有导入逻辑 */
 window.__ztShellFile=async function(url,name,kind){
@@ -102,7 +114,7 @@ window.__ztShellFile=async function(url,name,kind){
       added++;
     });
     saveV();renderVocab();toast("导入完成：新增 "+added+" 个，跳过重复 "+skip+" 个");
-  }catch(e){toast("导入失败："+(e&&e.message||e))}
+  }catch(e){shellLogToast("导入失败："+(e&&e.message||e))}
 };
 /* Apple Pencil 笔杆「轻点两下」：Safari 不转发，App 里由原生 UIPencilInteraction
    按系统设置（设置→Apple Pencil→轻点两下）识别后转发到这里。 */

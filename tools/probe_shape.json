@@ -1,0 +1,24 @@
+[
+  {
+    "name": "open-blank-pdf",
+    "awaitPromise": true,
+    "waitMs": 1200,
+    "expr": "(async () => { const d = await PDFLib.PDFDocument.create(); d.addPage([595, 842]); const b = await d.save(); await ZT.openB64(ZT.b64(b), 'shape.pdf'); return 'opened:' + ZT.state().pages; })()"
+  },
+  {
+    "name": "prep",
+    "expr": "ZT.setTool('pen'); window.__perf = { rebuild: 0, composite: 0 }; window.__r = ZT.pageRect(0); window.__ic = document.querySelector('.pv[data-i=\"0\"] .ic'); 'ok'"
+  },
+  {
+    "name": "draw-circle-and-dwell-convert",
+    "awaitPromise": true,
+    "waitMs": 1400,
+    "expr": "(async () => { const R = window.__r, cs = R.cssScale, ic = window.__ic; const ev = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.4, clientX: R.left + x * cs, clientY: R.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); const pts = ZT.mockLoopPts('circle', 46, 1); ic.dispatchEvent(ev('pointerdown', pts[0][0], pts[0][1], 60)); for (let i = 1; i < pts.length; i++) window.dispatchEvent(ev('pointermove', pts[i][0], pts[i][1], 60)); await new Promise(res => setTimeout(res, 950)); window.dispatchEvent(ev('pointerup', pts[pts.length - 1][0], pts[pts.length - 1][1], 60)); await new Promise(res => setTimeout(res, 200)); const last = ZT.lastStroke(0); return JSON.stringify({ strokes: ZT.state().strokes, kind: last ? last.k : null, selRect: last ? last.pts : null }); })()"
+  },
+  {
+    "name": "resize-gesture",
+    "awaitPromise": true,
+    "waitMs": 500,
+    "expr": "(async () => { const R = window.__r, cs = R.cssScale, ic = window.__ic; const ev = (type, x, y, id) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'pen', pointerId: id, isPrimary: true, pressure: 0.4, clientX: R.left + x * cs, clientY: R.top + y * cs, buttons: type === 'pointerup' ? 0 : 1 }); const before = window.__perf.rebuild; ic.dispatchEvent(ev('pointerdown', 150, 150, 61)); const t0 = performance.now(); for (let i = 1; i <= 20; i++) window.dispatchEvent(ev('pointermove', 150 + i * 3, 150 + i * 3, 61)); const ms = performance.now() - t0; const during = window.__perf.rebuild - before; window.dispatchEvent(ev('pointerup', 210, 210, 61)); await new Promise(res => setTimeout(res, 250)); const st = ZT.lastStroke(0); return JSON.stringify({ resizeMs: Math.round(ms), rebuildsDuring: during, rebuildsAfterUp: window.__perf.rebuild - before - during, newBox: st ? st.pts : null, ink: ZT.inkStats(0) }); })()"
+  }
+]

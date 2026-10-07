@@ -806,13 +806,25 @@ function shellImport(kind){
   try{window.webkit.messageHandlers.ztBridge.postMessage({type:"import",kind:kind})}
   catch(e){toast("导入桥不可用："+(e&&e.message||e))}
 }
+/* 失败诊断：把本地服务器最近请求日志尾带进 toast（2026-10-07 用户报桥失败，先补可观测性） */
+function shellLogToast(msg,ms){
+  fetch("/__zt/log").then(function(l){return l.text()}).then(function(t){
+    toast(msg+"｜服务器: "+t.slice(-180).replace(/\n/g," ⏎ "),ms||9000);
+  },function(){toast(msg,ms||6000)});
+}
 function shellSendExport(name,blob){
   showLoading("正在交给系统保存…");
   fetch("/__zt/export?name="+encodeURIComponent(name),{method:"POST",body:blob}).then(function(r){
     hideLoading();
-    if(!r.ok){toast("导出桥失败 HTTP "+r.status);return}
+    if(!r.ok){
+      r.text().then(function(t){shellLogToast("导出桥失败 HTTP "+r.status+" "+t)},function(){toast("导出桥失败 HTTP "+r.status,6000)});
+      return;
+    }
     try{window.webkit.messageHandlers.ztBridge.postMessage({type:"exported",name:name})}catch(e){}
-  },function(e){hideLoading();toast("导出桥失败："+(e&&e.message||e))});
+  },function(e){
+    hideLoading();
+    shellLogToast("导出桥失败："+(e&&e.message||e));
+  });
 }
 /* 原生导入回灌：壳把文件放进 /__zt/inbox，这里取回构造 File 走既有导入逻辑 */
 window.__ztShellFile=async function(url,name,kind){
@@ -845,7 +857,7 @@ window.__ztShellFile=async function(url,name,kind){
       added++;
     });
     saveV();renderVocab();toast("导入完成：新增 "+added+" 个，跳过重复 "+skip+" 个");
-  }catch(e){toast("导入失败："+(e&&e.message||e))}
+  }catch(e){shellLogToast("导入失败："+(e&&e.message||e))}
 };
 /* Apple Pencil 笔杆「轻点两下」：Safari 不转发，App 里由原生 UIPencilInteraction
    按系统设置（设置→Apple Pencil→轻点两下）识别后转发到这里。 */
@@ -1333,16 +1345,21 @@ function compositeInk(pv){
   if(window.__perf)window.__perf.composite=(window.__perf.composite||0)+1; /* 仅供自动化统计 */
   var ctx=pv.ictx,k=pv.icK||renderK(pv);
   var useBase=!!(pv.base&&pv.bctx&&pv.baseK===k&&pv.base.width===pv.ic.width&&pv.base.height===pv.ic.height);
-  /* 多选移动/缩放期间：底图换成"去掉选区"的 baseExcl，选中的几笔按当前数据叠画在上层。
-     手势中绝不重建整页底图（那是多选卡顿的根源，2026-10-07 用户反馈） */
-  var gestSel=!!(live&&(live.mode==="mv"||live.mode==="msz")&&MSELS&&MSELS.pi===pv.i&&pv.baseExcl&&pv.baseExclK===k);
+  /* 多选/图形手势期间：底图换成"去掉选区"的 baseExcl，选中的笔迹按当前数据叠画在上层。
+     手势中绝不重建整页底图（那是多选/图形拖动缩放卡顿的根源，2026-10-07 用户反馈） */
+  var gestList=null;
+  if(live&&live.pv===pv&&pv.baseExcl&&pv.baseExclK===k){
+    if((live.mode==="mv"||live.mode==="msz")&&MSELS&&MSELS.pi===pv.i)gestList=MSELS.items;
+    else if(live.mode==="rsz"&&SEL&&SEL.pi===pv.i&&SEL.st)gestList=[SEL.st];
+  }
+  var gestSel=!!gestList;
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,pv.ic.width,pv.ic.height);
   if(gestSel)ctx.drawImage(pv.baseExcl,0,0);
   else if(useBase)ctx.drawImage(pv.base,0,0);
   ctx.setTransform(k,0,0,k,0,0);
   if(gestSel){
-    for(var gi=0;gi<MSELS.items.length;gi++)drawStroke(ctx,MSELS.items[gi]);
+    for(var gi=0;gi<gestList.length;gi++)drawStroke(ctx,gestList[gi]);
   }else if(!useBase){
     var pg=D&&D.pages[pv.i];
     if(pg&&pg.s)for(var i=0;i<pg.s.length;i++)drawStroke(ctx,pg.s[i]);
@@ -1351,19 +1368,20 @@ function compositeInk(pv){
   drawShapeSelUI(pv);  /* 增强版：规则图形的选中框与控制点（不落盘） */
   msDrawUI(pv);        /* 增强版：多选虚线框 / 选框 / 待触发的圈（不落盘） */
 }
-/* 多选手势专用底图：只画"未被选中"的笔迹，手势开始时建一次。
-   分配/尺寸与主底图同一套规则；手势结束（finish/abort）随 rebuildInkBase 作废。 */
-function buildBaseExcl(pv){
-  var vp1=S.vp1[pv.i];if(!vp1||!MSELS||MSELS.pi!==pv.i)return;
+/* 手势专用底图：只画"未被选中"的笔迹，手势开始时建一次。
+   分配/尺寸与主底图同一套规则；手势结束（finish/abort）随 rebuildInkBase 作废。
+   excl=要从底图里抠掉的笔迹数组（多选=MSELS.items，单个图形=[SEL.st]）。 */
+function buildBaseExcl(pv,excl){
+  var vp1=S.vp1[pv.i];if(!vp1||!excl||!excl.length)return;
   var k=pv.icK||renderK(pv);
   if(!pv.baseExcl)pv.baseExcl=document.createElement("canvas");
   pv.baseExcl.width=Math.max(1,Math.floor(vp1.width*k));
   pv.baseExcl.height=Math.max(1,Math.floor(vp1.height*k));
   pv.baseExclK=k;
   var ctx=pv.baseExcl.getContext("2d");
-  var pg=D.pages[pv.i],sel=MSELS.items;
+  var pg=D.pages[pv.i];
   ctx.setTransform(k,0,0,k,0,0);
-  if(pg&&pg.s)for(var i=0;i<pg.s.length;i++)if(sel.indexOf(pg.s[i])<0)drawStroke(ctx,pg.s[i]);
+  if(pg&&pg.s)for(var i=0;i<pg.s.length;i++)if(excl.indexOf(pg.s[i])<0)drawStroke(ctx,pg.s[i]);
 }
 /* 收笔增量叠底图：只把刚落库的这一笔画进现有底图（O(1)）。
    底图缺失/尺寸不匹配时返回 false，由调用方整页重建。
@@ -3827,6 +3845,7 @@ function shapeSelDown(e,pv){
   try{pv.pin.setPointerCapture(e.pointerId)}catch(err){}
   var op={k:"box",pi:pv.i,st:SEL.st,from:SEL.st.pts.slice()};
   undoStack.push(op);redoStack.length=0;
+  buildBaseExcl(pv,[SEL.st]); /* 手势期间用"去图形"快照渲染，抬手才整页重建（同多选，2026-10-07） */
   live={mode:"rsz",pv:pv,pid:e.pointerId,stroke:SEL.st,hi:hi,t0:performance.now(),sx:0,sy:0,moved:0,op:op};
   return true;
 }
@@ -3841,7 +3860,9 @@ function resizeShapeMove(pv,pt){
     if(hi===0||hi===1)ny=Math.min(ny,p[3]-MIN);else ny=Math.max(ny,p[1]+MIN);
     if(hi===0){p[0]=nx;p[1]=ny}else if(hi===1){p[2]=nx;p[1]=ny}else if(hi===2){p[2]=nx;p[3]=ny}else{p[0]=nx;p[3]=ny}
   }
-  redrawInk(pv);scheduleSaveD();
+  /* rAF 合帧重画（baseExcl 快照 + 该图形），不再每个 move 事件整页重描；
+     落盘由 finishResize 统一做（2026-10-07，同多选手势） */
+  schedulePaint(pv);
 }
 function finishResize(){
   var op=live.op;
@@ -3850,6 +3871,7 @@ function finishResize(){
     else{op.to=op.st.pts.slice();scheduleSaveD()}
   }
   live.op=null;live.stroke=SEL&&SEL.st;
+  if(live.pv)redrawInk(live.pv); /* 手势期间没整页重描，收尾重建一次正常底图 */
 }
 function abortResize(){
   var op=live.op;
@@ -4155,7 +4177,7 @@ function msDown(e,pv){
   e.preventDefault();
   try{pv.pin.setPointerCapture(e.pointerId)}catch(err){}
   var op=msBeginOp(pv);
-  buildBaseExcl(pv); /* 手势期间用"去选区"快照渲染，抬手才整页重建 */
+  buildBaseExcl(pv,MSELS.items); /* 手势期间用"去选区"快照渲染，抬手才整页重建 */
   live={mode:hi>=0?"msz":"mv",pv:pv,pid:e.pointerId,stroke:null,hi:hi,
         t0:performance.now(),sx:pt.x,sy:pt.y,moved:0,op:op,
         base:{box:{x0:MSELS.box.x0,y0:MSELS.box.y0,x1:MSELS.box.x1,y1:MSELS.box.y1},
